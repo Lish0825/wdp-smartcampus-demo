@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智慧校园可视化大屏</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+:root {
+  --bg: #060e24; --bg-panel: rgba(4,16,48,0.88);
+  --glow: rgba(10,245,255,0.18); --accent: #0af5ff; --accent-dim: #0656a0;
+  --txt: #d0e8ff; --txt2: #6ba8c9; --txt3: #5a8aaa;
+  --red: #ff4444; --orange: #ffc107; --green: #00e676;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:var(--bg);color:var(--txt);font-family:-apple-system,'Microsoft YaHei',sans-serif}
+#player{width:100vw;height:100vh;position:absolute;z-index:1}
+
+/* ── Header ── */
+#header{position:absolute;top:0;left:0;right:0;z-index:100;height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,rgba(4,16,48,.98),rgba(4,16,48,.6) 70%,transparent)}
+#header::after{content:'';position:absolute;bottom:0;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,var(--accent) 30%,var(--accent) 70%,transparent)}
+.header-row{width:100%;display:flex;align-items:center;justify-content:center;position:relative}
+.header-info{position:absolute;font-size:12px;color:var(--txt2);letter-spacing:1px}
+.header-info.left{left:24px}.header-info.right{right:24px}
+#header h1{font-size:26px;font-weight:700;letter-spacing:10px;background:linear-gradient(180deg,#fff,#6de8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#nav-tabs{display:flex;gap:6px;margin-top:4px}
+.nav-tab{padding:3px 20px;font-size:12px;color:var(--txt2);cursor:pointer;border:1px solid var(--glow);border-radius:2px;background:rgba(10,245,255,.04);transition:all .3s;letter-spacing:2px;user-select:none}
+.nav-tab:hover,.nav-tab.active{color:var(--accent);border-color:var(--accent);background:rgba(10,245,255,.12);text-shadow:0 0 8px rgba(10,245,255,.5)}
+
+/* ── Panel ── */
+.panel{background:var(--bg-panel);border:1px solid var(--glow);backdrop-filter:blur(6px);border-radius:2px;position:relative}
+.panel::before,.panel::after{content:'';position:absolute;width:12px;height:12px}
+.panel::before{top:-1px;left:-1px;border-top:2px solid var(--accent);border-left:2px solid var(--accent)}
+.panel::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent)}
+.panel-header{display:flex;align-items:center;padding:8px 12px;border-bottom:1px solid rgba(10,245,255,.12)}
+.panel-header::before{content:'';width:3px;height:14px;background:var(--accent);margin-right:8px;border-radius:1px}
+.panel-header h3{font-size:13px;font-weight:500;color:var(--accent);letter-spacing:2px}
+.panel-body{padding:10px 12px}
+
+/* ── Side panels ── */
+.module-content{display:none}.module-content.active{display:block}
+.left-panels,.right-panels{position:absolute;top:78px;z-index:10;width:300px;display:flex;flex-direction:column;gap:10px;bottom:42px;overflow-y:auto}
+.left-panels{left:14px}.right-panels{right:14px}
+.left-panels::-webkit-scrollbar,.right-panels::-webkit-scrollbar{width:0}
+
+/* ── Stat cards ── */
+.stat-grid{display:grid;gap:6px}.stat-grid.c3{grid-template-columns:repeat(3,1fr)}.stat-grid.c2{grid-template-columns:repeat(2,1fr)}
+.stat-item{text-align:center;padding:6px 2px}
+.stat-item .v{font-size:22px;font-weight:700;color:var(--accent);font-family:'Courier New',monospace}
+.stat-item .v.sm{font-size:16px}
+.stat-item .l{font-size:10px;color:var(--txt2);margin-top:2px}
+.stat-item .ic{font-size:18px;margin-bottom:2px}
+
+/* ── Tables ── */
+.dt{width:100%;border-collapse:collapse;font-size:11px}
+.dt th{color:var(--accent);font-weight:500;text-align:left;padding:5px 6px;border-bottom:1px solid rgba(10,245,255,.15)}
+.dt td{color:var(--txt2);padding:4px 6px;border-bottom:1px solid rgba(10,245,255,.06)}
+
+/* ── Scroll list ── */
+.scroll-list{max-height:120px;overflow-y:auto;font-size:12px;color:var(--txt2);line-height:1.7}
+.scroll-list::-webkit-scrollbar{width:2px}.scroll-list::-webkit-scrollbar-thumb{background:rgba(10,245,255,.3);border-radius:2px}
+.notice-item{padding:5px 0;border-bottom:1px solid rgba(10,245,255,.06)}
+.notice-item .tag{font-size:10px;color:var(--accent);margin-right:4px}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:1px 6px;border-radius:2px;font-size:10px}
+.badge.info{background:rgba(10,245,255,.15);color:var(--accent)}
+.badge.warn{background:rgba(255,193,7,.15);color:var(--orange)}
+.badge.danger{background:rgba(255,68,68,.15);color:var(--red)}
+.badge.ok{background:rgba(0,230,118,.15);color:var(--green)}
+
+/* ── Info card ── */
+.info-card{font-size:12px;color:var(--txt2);line-height:1.7}
+.info-card .t{color:var(--accent);font-size:13px;margin-bottom:4px}
+.info-card .m{color:var(--txt3);font-size:11px;margin-top:4px}
+
+/* ── Progress ── */
+.pg{margin:6px 0}.pg-row{display:flex;align-items:center;gap:8px;margin:5px 0}
+.pg-label{font-size:11px;color:var(--txt2);width:70px;flex-shrink:0}
+.pg-bar{flex:1;height:6px;background:rgba(10,245,255,.1);border-radius:3px;overflow:hidden}
+.pg-fill{height:100%;border-radius:3px;transition:width .6s}
+.pg-val{font-size:11px;color:var(--accent);width:36px;text-align:right;flex-shrink:0}
+
+/* ── Footer ── */
+#footer{position:absolute;bottom:0;left:0;right:0;z-index:100;height:36px;display:flex;align-items:center;padding:0 20px;background:linear-gradient(0deg,rgba(4,16,48,.95),transparent);font-size:11px;color:var(--txt3)}
+#footer::before{content:'';position:absolute;top:0;left:8%;right:8%;height:1px;background:linear-gradient(90deg,transparent,rgba(10,245,255,.15) 30%,rgba(10,245,255,.15) 70%,transparent)}
+.dot{width:7px;height:7px;border-radius:50%;margin-right:8px;display:inline-block;flex-shrink:0}
+.dot.ok{background:var(--green);box-shadow:0 0 8px var(--green)}.dot.wait{background:var(--orange);box-shadow:0 0 8px var(--orange);animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+#status-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.marquee{flex:2;overflow:hidden;color:var(--orange);margin:0 16px;font-size:11px}
+.marquee span{display:inline-block;white-space:nowrap;animation:scrollL 25s linear infinite}
+@keyframes scrollL{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+#clock{color:var(--accent);letter-spacing:1px;flex-shrink:0}
+
+/* ── Layer Control ── */
+#layer-panel{position:absolute;z-index:50;bottom:46px;left:50%;transform:translateX(-50%);display:flex;gap:6px;padding:6px 14px;background:var(--bg-panel);border:1px solid var(--glow);border-radius:4px;backdrop-filter:blur(6px)}
+#layer-panel::before,#layer-panel::after{content:'';position:absolute;width:10px;height:10px}
+#layer-panel::before{top:-1px;left:-1px;border-top:2px solid var(--accent);border-left:2px solid var(--accent)}
+#layer-panel::after{bottom:-1px;right:-1px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent)}
+.layer-btn{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px 10px 4px;font-size:11px;color:var(--txt2);cursor:pointer;border:1px solid var(--glow);border-radius:3px;background:rgba(10,245,255,.04);transition:all .25s;user-select:none;white-space:nowrap;min-width:0}
+.layer-btn:hover{border-color:var(--accent);color:var(--accent)}
+.layer-btn.on{color:#fff;border-color:var(--accent);background:rgba(10,245,255,.2);text-shadow:0 0 6px rgba(10,245,255,.5)}
+.layer-btn.on .layer-dot{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.layer-btn .layer-dot{width:6px;height:6px;border-radius:50%;background:var(--txt3);transition:all .25s;flex-shrink:0}
+.layer-btn.loading{opacity:.6;pointer-events:none}
+.layer-btn.loading .layer-dot{background:var(--orange);animation:blink 1s infinite}
+.layer-legend{display:flex;gap:8px;margin-top:4px;padding:0 2px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--txt3)}
+.legend-item .lc{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="player"></div>
+
+<!-- ══════ Header ══════ -->
+<div id="header">
+  <div class="header-row">
+    <span class="header-info left"><span id="clock"></span> &nbsp;|&nbsp; ☀ 22°C 晴</span>
+    <h1>智 慧 校 园 可 视 化 大 屏</h1>
+    <span class="header-info right">值班：张明 &nbsp;|&nbsp; 复旦大学邯郸校区</span>
+  </div>
+  <div id="nav-tabs">
+    <div class="nav-tab active" data-module="overview">校园概览</div>
+    <div class="nav-tab" data-module="detect">智能检测</div>
+    <div class="nav-tab" data-module="device">设备运维</div>
+    <div class="nav-tab" data-module="security">安防管理</div>
+  </div>
+</div>
+
+<!-- ══════ 模块一：校园概览 ══════ -->
+<div class="module-content active" data-module="overview">
+  <div class="left-panels">
+    <div class="panel"><div class="panel-header"><h3>校园核心指标</h3></div><div class="panel-body">
+      <div class="stat-grid c3">
+        <div class="stat-item"><div class="ic">🎓</div><div class="v">37800</div><div class="l">学生总数</div></div>
+        <div class="stat-item"><div class="ic">👨‍🏫</div><div class="v">2300</div><div class="l">教师总数</div></div>
+        <div class="stat-item"><div class="ic">👷</div><div class="v">680</div><div class="l">职工总数</div></div>
+      </div>
+      <div class="stat-grid c3" style="margin-top:6px">
+        <div class="stat-item"><div class="v sm">186</div><div class="l">在校班级</div></div>
+        <div class="stat-item"><div class="v sm">38</div><div class="l">建筑总数</div></div>
+        <div class="stat-item"><div class="v sm">922亩</div><div class="l">占地面积</div></div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>建筑资源分布</h3></div><div class="panel-body"><div id="ec-ov-building" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>人员空间分布</h3></div><div class="panel-body"><div id="ec-ov-population" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>校园简介</h3></div><div class="panel-body">
+      <div class="info-card">
+        <div class="t">复旦大学 · 邯郸校区</div>
+        复旦大学创建于1905年，是中国人自主创办的第一所高等院校。邯郸校区为主校区，位于上海市杨浦区，占地约922亩，拥有光华楼、逸夫科技楼等标志性建筑。
+        <div class="m">地址：上海市杨浦区邯郸路220号</div>
+      </div>
+    </div></div>
+  </div>
+  <div class="right-panels">
+    <div class="panel"><div class="panel-header"><h3>通知公告</h3></div><div class="panel-body">
+      <div class="scroll-list">
+        <div class="notice-item"><span class="tag">[通知]</span>4月14日，学校召开2026年度教育大会，深入学习贯彻全面从严治校精神。</div>
+        <div class="notice-item"><span class="tag">[公告]</span>4月10日，图书馆新馆正式启用，面积约12000m²，藏书150万册。</div>
+        <div class="notice-item"><span class="tag">[活动]</span>4月8日，"创新杯"全国大学生科技竞赛校内选拔赛开始报名。</div>
+        <div class="notice-item"><span class="tag">[维修]</span>4月6日起三教空调系统升级维护，预计5个工作日完成。</div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>教学运行态势</h3></div><div class="panel-body"><div id="ec-ov-teaching" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>空间使用率</h3></div><div class="panel-body"><div id="ec-ov-space" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>校园荣誉</h3></div><div class="panel-body" style="padding:0 6px">
+      <table class="dt"><thead><tr><th>时间</th><th>荣誉</th><th>获奖人</th><th>部门</th></tr></thead>
+      <tbody>
+        <tr><td>2026.3</td><td>省优秀学生</td><td>张三</td><td>信息学院</td></tr>
+        <tr><td>2026.1</td><td>青年创新奖</td><td>李四</td><td>经管学院</td></tr>
+        <tr><td>2025.11</td><td>创新赛金奖</td><td>王五</td><td>计算机</td></tr>
+        <tr><td>2025.9</td><td>校园1000m纪录</td><td>赵六</td><td>体育部</td></tr>
+      </tbody></table>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══════ 模块二：智能检测 ══════ -->
+<div class="module-content" data-module="detect">
+  <div class="left-panels">
+    <div class="panel"><div class="panel-header"><h3>检测总览</h3></div><div class="panel-body">
+      <div class="stat-grid c2">
+        <div class="stat-item"><div class="v">1286</div><div class="l">今日检测次数</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--orange)">47</div><div class="l">异常事件数</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--red)">5</div><div class="l">高风险事件</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--green)">39</div><div class="l">已处置事件</div></div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>异常类型分布</h3></div><div class="panel-body"><div id="ec-dt-type" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>高风险区域排行</h3></div><div class="panel-body"><div id="ec-dt-hotarea" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>检测时段趋势</h3></div><div class="panel-body"><div id="ec-dt-trend" style="height:130px"></div></div></div>
+  </div>
+  <div class="right-panels">
+    <div class="panel"><div class="panel-header"><h3>实时告警列表</h3></div><div class="panel-body" style="padding:0 6px">
+      <table class="dt"><thead><tr><th>时间</th><th>区域</th><th>类型</th><th>等级</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>14:32</td><td>食堂区</td><td>人员聚集</td><td><span class="badge warn">一般</span></td><td>待处置</td></tr>
+        <tr><td>13:15</td><td>实验楼</td><td>烟雾报警</td><td><span class="badge danger">紧急</span></td><td>处置中</td></tr>
+        <tr><td>12:40</td><td>宿舍区</td><td>异常逗留</td><td><span class="badge info">提示</span></td><td>已关闭</td></tr>
+        <tr><td>11:08</td><td>校门口</td><td>车辆违停</td><td><span class="badge warn">一般</span></td><td>已关闭</td></tr>
+        <tr><td>09:55</td><td>操场</td><td>人员聚集</td><td><span class="badge info">提示</span></td><td>已关闭</td></tr>
+      </tbody></table>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>摄像头检测覆盖</h3></div><div class="panel-body"><div id="ec-dt-camera" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>处置闭环分析</h3></div><div class="panel-body"><div id="ec-dt-funnel" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>重点画面</h3></div><div class="panel-body">
+      <div class="info-card">
+        <div class="t">🔴 实验楼B座 3F — 烟雾检测</div>
+        13:15 触发烟雾报警，AI置信度 92%。已通知消防值班、安保巡逻组。等待现场确认中。
+        <div class="m">摄像头 CAM-EB3-027 | 最近截图 13:16</div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══════ 模块三：设备运维 ══════ -->
+<div class="module-content" data-module="device">
+  <div class="left-panels">
+    <div class="panel"><div class="panel-header"><h3>设备运行总览</h3></div><div class="panel-body">
+      <div class="stat-grid c3">
+        <div class="stat-item"><div class="v">2460</div><div class="l">设备总数</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--green)">2318</div><div class="l">在线设备</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--txt3)">98</div><div class="l">离线设备</div></div>
+      </div>
+      <div class="stat-grid c2" style="margin-top:6px">
+        <div class="stat-item"><div class="v sm" style="color:var(--red)">44</div><div class="l">故障设备</div></div>
+        <div class="stat-item"><div class="v sm" style="color:var(--orange)">23</div><div class="l">今日告警</div></div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>设备分类运行状态</h3></div><div class="panel-body"><div id="ec-dv-status" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>工单处置趋势</h3></div><div class="panel-body"><div id="ec-dv-workorder" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>故障设备排行</h3></div><div class="panel-body" style="padding:0 6px">
+      <table class="dt"><thead><tr><th>设备</th><th>位置</th><th>故障次数</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>空调机组#12</td><td>三教</td><td>7</td><td><span class="badge danger">故障</span></td></tr>
+        <tr><td>配电柜#8</td><td>宿舍C座</td><td>5</td><td><span class="badge warn">异常</span></td></tr>
+        <tr><td>电梯#3</td><td>光华楼</td><td>4</td><td><span class="badge ok">已修</span></td></tr>
+        <tr><td>水泵#6</td><td>食堂区</td><td>3</td><td><span class="badge warn">异常</span></td></tr>
+      </tbody></table>
+    </div></div>
+  </div>
+  <div class="right-panels">
+    <div class="panel"><div class="panel-header"><h3>巡检任务执行</h3></div><div class="panel-body">
+      <div class="stat-grid c2" style="margin-bottom:8px">
+        <div class="stat-item"><div class="v sm">12</div><div class="l">今日任务数</div></div>
+        <div class="stat-item"><div class="v sm" style="color:var(--green)">8</div><div class="l">已完成</div></div>
+      </div>
+      <div class="pg">
+        <div class="pg-row"><span class="pg-label">水电巡检</span><div class="pg-bar"><div class="pg-fill" style="width:100%;background:linear-gradient(90deg,var(--accent-dim),var(--accent))"></div></div><span class="pg-val">100%</span></div>
+        <div class="pg-row"><span class="pg-label">消防巡检</span><div class="pg-bar"><div class="pg-fill" style="width:75%;background:linear-gradient(90deg,#065a34,var(--green))"></div></div><span class="pg-val">75%</span></div>
+        <div class="pg-row"><span class="pg-label">弱电巡检</span><div class="pg-bar"><div class="pg-fill" style="width:50%;background:linear-gradient(90deg,#6a3800,#ff8800)"></div></div><span class="pg-val">50%</span></div>
+        <div class="pg-row"><span class="pg-label">保洁巡检</span><div class="pg-bar"><div class="pg-fill" style="width:30%;background:linear-gradient(90deg,var(--accent-dim),var(--accent))"></div></div><span class="pg-val">30%</span></div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>资产生命周期</h3></div><div class="panel-body"><div id="ec-dv-lifecycle" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>能耗趋势分析</h3></div><div class="panel-body"><div id="ec-dv-energy" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>维修调度表</h3></div><div class="panel-body" style="padding:0 6px">
+      <table class="dt"><thead><tr><th>工单</th><th>位置</th><th>优先级</th><th>维修人</th></tr></thead>
+      <tbody>
+        <tr><td>#W2041</td><td>三教5F</td><td><span class="badge danger">高</span></td><td>王工</td></tr>
+        <tr><td>#W2039</td><td>宿舍C座</td><td><span class="badge warn">中</span></td><td>李工</td></tr>
+        <tr><td>#W2037</td><td>食堂B区</td><td><span class="badge info">低</span></td><td>赵工</td></tr>
+      </tbody></table>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══════ 模块四：安防管理 ══════ -->
+<div class="module-content" data-module="security">
+  <div class="left-panels">
+    <div class="panel"><div class="panel-header"><h3>安防态势总览</h3></div><div class="panel-body">
+      <div class="stat-grid c2">
+        <div class="stat-item"><div class="v">68</div><div class="l">今日安防事件</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--red)">9</div><div class="l">未处理事件</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--green)">326</div><div class="l">在线安防设备</div></div>
+        <div class="stat-item"><div class="v" style="color:var(--accent)">42</div><div class="l">在岗安保人员</div></div>
+      </div>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>事件类型分布</h3></div><div class="panel-body"><div id="ec-sc-type" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>区域风险分级</h3></div><div class="panel-body"><div id="ec-sc-risk" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>安防力量布控</h3></div><div class="panel-body"><div id="ec-sc-radar" style="height:150px"></div></div></div>
+  </div>
+  <div class="right-panels">
+    <div class="panel"><div class="panel-header"><h3>门禁通行态势</h3></div><div class="panel-body"><div id="ec-sc-access" style="height:130px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>告警处置闭环</h3></div><div class="panel-body"><div id="ec-sc-funnel" style="height:140px"></div></div></div>
+    <div class="panel"><div class="panel-header"><h3>重点告警列表</h3></div><div class="panel-body" style="padding:0 6px">
+      <table class="dt"><thead><tr><th>时间</th><th>区域</th><th>事件</th><th>等级</th><th>状态</th></tr></thead>
+      <tbody>
+        <tr><td>14:50</td><td>周界北侧</td><td>翻越围栏</td><td><span class="badge danger">紧急</span></td><td>处置中</td></tr>
+        <tr><td>14:12</td><td>实验区</td><td>门禁异常</td><td><span class="badge warn">重要</span></td><td>待处置</td></tr>
+        <tr><td>13:30</td><td>宿舍区</td><td>烟感报警</td><td><span class="badge warn">重要</span></td><td>已关闭</td></tr>
+        <tr><td>12:05</td><td>校门</td><td>黑名单人员</td><td><span class="badge danger">紧急</span></td><td>已关闭</td></tr>
+        <tr><td>10:20</td><td>停车区</td><td>车辆异常</td><td><span class="badge info">提示</span></td><td>已关闭</td></tr>
+      </tbody></table>
+    </div></div>
+    <div class="panel"><div class="panel-header"><h3>应急资源</h3></div><div class="panel-body">
+      <div class="stat-grid c3">
+        <div class="stat-item"><div class="v sm">86</div><div class="l">消防栓</div></div>
+        <div class="stat-item"><div class="v sm">240</div><div class="l">灭火器</div></div>
+        <div class="stat-item"><div class="v sm">32</div><div class="l">应急广播</div></div>
+        <div class="stat-item"><div class="v sm">18</div><div class="l">疏散口</div></div>
+        <div class="stat-item"><div class="v sm">24</div><div class="l">急救箱</div></div>
+        <div class="stat-item"><div class="v sm">6</div><div class="l">安保驻点</div></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ══════ 图层控制 ══════ -->
+<div id="layer-panel">
+  <div class="layer-btn" data-layer="poi">
+    <span class="layer-dot"></span>建筑设施标注
+    <div class="layer-legend"><span class="legend-item"><span class="lc" style="background:#ff4444"></span>标注点</span></div>
+  </div>
+  <div class="layer-btn" data-layer="heatmap">
+    <span class="layer-dot"></span>人流密度热力
+    <div class="layer-legend"><span class="legend-item"><span class="lc" style="background:#00e676"></span>正常</span><span class="legend-item"><span class="lc" style="background:#ffc107"></span>轻度</span><span class="legend-item"><span class="lc" style="background:#ff8800"></span>中度</span><span class="legend-item"><span class="lc" style="background:#ff4444"></span>高风险</span></div>
+  </div>
+  <div class="layer-btn" data-layer="patrol">
+    <span class="layer-dot"></span>设备巡检路线
+    <div class="layer-legend"><span class="legend-item"><span class="lc" style="background:#0af5ff"></span>水电</span><span class="legend-item"><span class="lc" style="background:#ff8800"></span>消防</span></div>
+  </div>
+  <div class="layer-btn" data-layer="dispatch">
+    <span class="layer-dot"></span>维修调度路线
+    <div class="layer-legend"><span class="legend-item"><span class="lc" style="background:#448aff"></span>人员</span><span class="legend-item"><span class="lc" style="background:#00e676"></span>物资</span><span class="legend-item"><span class="lc" style="background:#ff5252"></span>抢修</span></div>
+  </div>
+  <div class="layer-btn" data-layer="zone">
+    <span class="layer-dot"></span>安防风险分区
+    <div class="layer-legend"><span class="legend-item"><span class="lc" style="background:#0af5ff"></span>正常</span><span class="legend-item"><span class="lc" style="background:#ffc107"></span>预警</span><span class="legend-item"><span class="lc" style="background:#ff4444"></span>危险</span></div>
+  </div>
+</div>
+
+<!-- ══════ Footer ══════ -->
+<div id="footer">
+  <span class="dot wait" id="status-dot"></span>
+  <span id="status-text">正在初始化场景...</span>
+  <div class="marquee"><span>⚠ 14:50 周界北侧检测到翻越围栏事件 ⚠ 13:15 实验楼B座触发烟雾报警 ⚠ 请相关人员及时处置</span></div>
+  <span id="clock"></span>
+</div>
+
+<script type="module" src="./main.js"></script>
+</body>
+</html>

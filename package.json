@@ -1,0 +1,15 @@
+{
+  "name": "wdp-demo",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "wdpapi": "^2.3.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
